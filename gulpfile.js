@@ -98,7 +98,7 @@ function runKarma(done, singleRun, browsers) {
   karma.server.start({
     configFile: path.resolve("karma.conf.js"),
     singleRun: singleRun,
-    browsers: browsers || ["Chrome"]
+    browsers: browsers || ["PhantomJS"]
   }, function (failedTests) {
     if (failedTests && shouldExitOnFailure()) {
       throw new Error("Terminating process due to failing tests.");
