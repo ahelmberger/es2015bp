@@ -1,3 +1,9 @@
 import greeter from "./greeter";
 
-console.log(greeter.greet("World"));
+function appendContent (content) {
+  const div = document.createElement("div");
+  div.textContent = content;
+  document.body.appendChild(div);
+}
+
+appendContent(greeter.greet("ECMAScript 2015"));
