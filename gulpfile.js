@@ -6,18 +6,19 @@ var path               = require("path");
 var gulp               = require("gulp");
 var less               = require("less");
 var jspm               = require("jspm");
-var karma              = require("karma");
 var rimraf             = require("rimraf");
 var runSequence        = require("run-sequence");
 var browserSync        = require("browser-sync");
 var CleanCssPlugin     = require("less-plugin-clean-css");
 var AutoPrefixPlugin   = require("less-plugin-autoprefix");
 var historyApiFallback = require("connect-history-api-fallback");
+var tools              = require("require-dir")("build", { camelcase: true });
 var $                  = require("gulp-load-plugins")();
 
 var supportedBrowsers  = ["last 3 versions", "last 3 BlackBerry versions", "last 3 Android versions"];
 var autoPrefix         = new AutoPrefixPlugin({ browsers: supportedBrowsers });
 var cleanCss           = new CleanCssPlugin({ advanced: true });
+var exitOnError        = true;
 
 gulp.task("clean", function (done) {
   rimraf("dist", { maxBusyTries: 5 }, done);
@@ -27,7 +28,7 @@ gulp.task("lint", function () {
   return gulp.src(["*.js", "app/!(jspm_packages)/**/*.js"])
     .pipe($.eslint())
     .pipe($.eslint.format())
-    .pipe($.if(shouldExitOnFailure, $.eslint.failAfterError()));
+    .pipe($.if(exitOnError, $.eslint.failAfterError()));
 });
 
 gulp.task("build:styles", function () {
@@ -39,8 +40,9 @@ gulp.task("build:styles", function () {
 });
 
 gulp.task("build:scripts", function (done) {
+  var bundleOptions = { minify: true, mangle: true, sourceMaps: true, lowResSourceMaps: false };
   jspm.setPackagePath(".");
-  jspm.bundleSFX("main", "dist/main.js", { minify: true, mangle: true, sourceMaps: true, lowResSourceMaps: false }).then(done, done);
+  jspm.bundleSFX("main", "dist/main.js", bundleOptions).then(done, done);
 });
 
 gulp.task("build:html", function () {
@@ -55,18 +57,26 @@ gulp.task("build", function (done) {
 });
 
 gulp.task("sanitize-sourcemaps", function (done) {
-  ["dist/main.js.map", "dist/main.css.map"].forEach(function (sourceMapPath) {
-    patchSourceMap(sourceMapPath, "app", "/sources/");
-  });
-  done();
+  tools.sanitizeSourceMaps("dist/*.map", "app", "/sources/", done);
+});
+
+gulp.task("serve", function () {
+  var lessFallbackOptions = { root: "app", plugins: [cleanCss, autoPrefix], sourceMap: true };
+  tools.startBrowserSync("app", [cssToLessFallback(lessFallbackOptions), historyApiFallback]);
+});
+
+gulp.task("serve:dist", function () {
+  tools.startBrowserSync("dist", [historyApiFallback]);
 });
 
 gulp.task("test", function (done) {
-  runKarma(done, true, ["PhantomJS"]);
+  var options = { configFile: path.resolve("karma.conf.js"), singleRun: true, browsers: ["PhantomJS"] };
+  tools.runKarma(options, exitOnError, done);
 });
 
 gulp.task("test:debug", function (done) {
-  runKarma(done, false, ["Chrome"]);
+  var options = { configFile: path.resolve("karma.conf.js"), singleRun: false, browsers: ["Chrome"] };
+  tools.runKarma(options, exitOnError, done);
 });
 
 gulp.task("lint-and-test", function (done) {
@@ -74,35 +84,17 @@ gulp.task("lint-and-test", function (done) {
 });
 
 gulp.task("reload-styles", function () {
-  browserSync.reload("main.less");
+  browserSync.reload("main.css");
 });
 
-gulp.task("serve", function () {
-  var lessFallbackOptions = { root: "app", plugins: [cleanCss, autoPrefix], sourceMap: true };
-  startBrowserSync("app", [cssToLessFallback(lessFallbackOptions), historyApiFallback]);
-  gulp.watch(["*.js"], ["lint"]);
+gulp.task("watch", ["serve"], function () {
+  exitOnError = false;
+  gulp.watch(["*.js", "build/*.js"], ["lint"]);
   gulp.watch(["app/**/*.js"], ["lint-and-test"]);
   gulp.watch(["app/**/*.less"], ["reload-styles"]);
 });
 
-gulp.task("serve:dist", function () {
-  startBrowserSync("dist", [historyApiFallback]);
-});
-
-gulp.task("default", ["serve"]);
-
-function patchSourceMap(sourceMapPath, baseDir, sourceRoot, file) {
-  var sourceMap = JSON.parse(fs.readFileSync(sourceMapPath, "utf-8"));
-  sourceMap.sourcesContent = sourceMap.sources.map(function (source) {
-    return fs.readFileSync(path.resolve(path.dirname(sourceMapPath), source), "utf-8");
-  });
-  sourceMap.sources = sourceMap.sources.map(function (source) {
-    return path.relative(path.resolve(baseDir), path.resolve(path.dirname(sourceMapPath), source));
-  });
-  sourceMap.sourceRoot = sourceRoot || "/";
-  sourceMap.file = file || path.basename(sourceMapPath).replace(/\.map$/, "");
-  fs.writeFileSync(sourceMapPath, JSON.stringify(sourceMap));
-}
+gulp.task("default", ["watch"]);
 
 function cssToLessFallback(options) {
   var root = path.resolve(options.root);
@@ -110,45 +102,51 @@ function cssToLessFallback(options) {
     var requestedPath = url.parse(req.url).pathname;
     if (requestedPath.match(/\.css$/)) {
       var cssFile = path.resolve(path.join(root, requestedPath));
-      var lessFile = path.resolve(path.join(root, requestedPath.replace(/\.css$/, ".less")));
+      var lessFile = path.resolve(path.join(root, requestedPath.replace(/\.css$/, '.less')));
       if (!fs.existsSync(cssFile) && fs.existsSync(lessFile)) {
         var content = fs.readFileSync(lessFile).toString();
         var lessOptions = { filename: lessFile, plugins: options.plugins };
         if (options.sourceMap) {
           lessOptions.sourceMap = { sourceMapFileInline: true, sourceMapBasepath: path.dirname(lessFile) };
         }
-        return less.render(content, lessOptions).then(function (output) {
-          res.setHeader("Content-Type", "text/css");
-          res.end(output.css);
-        });
+        return less.render(content, lessOptions)
+          .then(function (output) {
+            res.setHeader('Content-Type', 'text/css');
+            res.end(output.css);
+            next();
+          })
+          .catch(function (error) {
+            res.setHeader('Content-Type', 'text/css');
+            res.end(createCssErrorMessage(error));
+            next();
+          });
       }
     }
     next();
   };
 }
 
-function runKarma(done, singleRun, browsers) {
-  karma.server.start({
-    configFile: path.resolve("karma.conf.js"),
-    singleRun: singleRun,
-    browsers: browsers || ["PhantomJS"]
-  }, function (failedTests) {
-    if (failedTests && shouldExitOnFailure()) {
-      throw new Error("Terminating process due to failing tests.");
-    }
-    done();
+function createCssErrorMessage(error) {
+  var rules = {
+    'display'    : 'block',
+    'z-index'    : '1000',
+    'position'   : 'fixed',
+    'top'        : '0',
+    'left'       : '0',
+    'right'      : '0',
+    'font-size'  : '.9em',
+    'padding'    : '1.5em 1em 1.5em 4.5em',
+    'color'      : 'white',
+    'background' : 'linear-gradient(#DF4F5E, #CE3741)',
+    'border'     : '1px solid #C64F4B',
+    'box-shadow' : 'inset 0 1px 0 #EB8A93, 0 0 .3em rgba(0, 0, 0, .5)',
+    'white-space': 'pre',
+    'font-family': 'monospace',
+    'text-shadow': '0 1px #A82734',
+    'content'    : '"' + error.toString().replace(/"/g, '\\"') + '"'
+  };
+  var combinedRules = Object.keys(rules).map(function (key) {
+    return key + ':' + rules[key];
   });
-}
-
-function startBrowserSync(baseDir, middleware) {
-  browserSync({
-    files: [baseDir + "/**"],
-    server: { baseDir: baseDir, middleware: middleware },
-    startPath: "/",
-    browser: "default"
-  });
-}
-
-function shouldExitOnFailure() {
-  return !browserSync.active;
+  return 'html::before{' + combinedRules.join(';') + '}';
 }
