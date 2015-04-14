@@ -12,13 +12,14 @@ var $                  = require('gulp-load-plugins')();
 var supportedBrowsers  = ['last 3 versions', 'last 3 BlackBerry versions', 'last 3 Android versions'];
 var exitOnError        = true;
 
-gulp.task('clean', function () {
+gulp.task('clean', function (done) {
   rimraf.sync('.tmp', { maxBusyTries: 5 });
   rimraf.sync('dist', { maxBusyTries: 5 });
+  done();
 });
 
 gulp.task('lint', function () {
-  return gulp.src(['*.js', 'app/!(jspm_packages)/**/*.js'])
+  return gulp.src(['*.js', 'build/**/*.js', 'app/**/*.js', '!app/jspm_packages/**', '!app/config.js'])
     .pipe($.eslint())
     .pipe($.eslint.format())
     .pipe($.if(exitOnError, $.eslint.failAfterError()));
@@ -47,11 +48,11 @@ gulp.task('build:styles', function (done) {
 });
 
 gulp.task('build:scripts', function (done) {
-  var bundleOptions = { minify: true, mangle: false, sourceMaps: true, lowResSourceMaps: true };
+  var bundleOptions = { minify: true, mangle: false, sourceMaps: true, lowResSourceMaps: false };
   jspm.setPackagePath('.');
-  jspm.bundleSFX('main', 'dist/main.js', bundleOptions)
-    .then(function () { tools.sanitizeSourceMap('dist/main.js.map', 'app', '/sources/'); })
-    .then(done, done);
+  jspm.bundleSFX('main', 'dist/main.js', bundleOptions).then(function () {
+    tools.sanitizeSourceMap('dist/main.js.map', 'app', '/sources/');
+  }).then(done, done);
 });
 
 gulp.task('build:html', function () {
@@ -63,10 +64,6 @@ gulp.task('build:html', function () {
 
 gulp.task('build', function (done) {
   runSequence('clean', 'lint', 'test', ['build:styles', 'build:scripts', 'build:html'], done);
-});
-
-gulp.task('sanitize-sourcemap', function (done) {
-  tools.sanitizeSourceMaps('dist/*.map', 'app', '/sources/', done);
 });
 
 gulp.task('serve', ['styles'], function () {
