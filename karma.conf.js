@@ -1,26 +1,26 @@
-"use strict";
+'use strict';
 
 module.exports = function (config) {
 
   config.set({
-    basePath: "",
-    frameworks: ["jspm", "jasmine", "phantomjs-shim"],
+    basePath: '',
+    frameworks: ['jspm', 'jasmine', 'phantomjs-shim'],
     files: [],
     jspm: {
-      serveFiles: ["app/**"],
-      loadFiles: ["app/**/*.specs.js"]
+      serveFiles: ['app/**'],
+      loadFiles: ['app/**/*.specs.js']
     },
     proxies: {
-      "/base/": "/base/app/"
+      '/base/': '/base/app/'
     },
     exclude: [],
     preprocessors: {},
-    reporters: ["spec"],
+    reporters: ['spec'],
     port: 9876,
     colors: true,
     logLevel: config.LOG_INFO,
     autoWatch: true,
-    browsers: ["PhantomJS"],
+    browsers: ['PhantomJS'],
     singleRun: false
   });
 

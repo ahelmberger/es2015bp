@@ -1,13 +1,13 @@
-import greeter from "greeter";
+import greeter from 'greeter';
 
-describe("The greeter", () => {
-  it("should greet", () => {
-    expect(greeter.greet("World")).toBe("Hello World!");
+describe('The greeter', () => {
+  it('should greet', () => {
+    expect(greeter.greet('World')).toBe('Hello World!');
   });
 });
 
-describe("Function.prototype.bind", () => {
-  it("should be a function", () => {
-    expect(typeof Function.prototype.bind).toBe("function");
+describe('Function.prototype.bind', () => {
+  it('should be a function', () => {
+    expect(typeof Function.prototype.bind).toBe('function');
   });
 });
