@@ -115,6 +115,8 @@
     "use-isnan": 2,
     "valid-typeof": 0,
     "wrap-iife": 2,
-    "wrap-regex": 0
+    "wrap-regex": 0,
+    "space-before-function-paren": [2, { "anonymous": "always", "named": "never" }],
+    "space-in-parens": [2, "never"]
   }
 }

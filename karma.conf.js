@@ -3,12 +3,12 @@
 module.exports = function (config) {
 
   config.set({
-    basePath: '',
+    basePath: 'app',
     frameworks: ['jspm', 'jasmine', 'phantomjs-shim'],
     files: [],
     jspm: {
-      serveFiles: ['app/**'],
-      loadFiles: ['app/**/*.specs.js']
+      serveFiles: ['**/*'],
+      loadFiles: ['polyfills.js', '**/*.specs.js']
     },
     proxies: {
       '/base/': '/base/app/'
